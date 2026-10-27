@@ -1,3 +1,3 @@
-const projectName: string = "Durable Job Execution Engine";
+import { getProjectStatus } from "./project.js";
 
-console.log(`Project initialized: ${projectName}`);
+console.log(getProjectStatus());
