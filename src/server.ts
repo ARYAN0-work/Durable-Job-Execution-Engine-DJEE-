@@ -1,6 +1,6 @@
 import { initializeApplication } from "./app.js";
-import { pool } from "./database.js";
-import { logger } from "./logging/logger.js";
+import { pool } from "./infrastructure/database/pool.js";
+import { logger } from "./infrastructure/logging/logger.js";
 
 let isShuttingDown = false;
 

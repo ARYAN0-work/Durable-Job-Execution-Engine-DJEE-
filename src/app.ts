@@ -1,10 +1,7 @@
-import { checkDatabaseConnection } from "./database.js";
-import { logger } from "./logging/logger.js";
-import { getProjectStatus } from "./project.js";
+import { checkDatabaseConnection } from "./infrastructure/database/pool.js";
+import { logger } from "./infrastructure/logging/logger.js";
 
 export async function initializeApplication(): Promise<void> {
-  logger.info(getProjectStatus());
-
   logger.info("Checking PostgreSQL connection");
 
   const connected = await checkDatabaseConnection();
