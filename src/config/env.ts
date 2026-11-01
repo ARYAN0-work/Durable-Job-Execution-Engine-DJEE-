@@ -20,12 +20,16 @@ const envSchema = z.object({
   DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(1).default(5000),
 });
 
-const result = envSchema.safeParse(process.env);
+export function parseEnv(environment: NodeJS.ProcessEnv) {
+  return envSchema.safeParse(environment);
+}
+
+const result = parseEnv(process.env);
 
 if (!result.success) {
-  console.error("Invalid environment configuration:");
-  console.error(z.prettifyError(result.error));
-  process.exit(1);
+  throw new Error(
+    `Invalid environment configuration:\n${z.prettifyError(result.error)}`,
+  );
 }
 
 export const env = result.data;
