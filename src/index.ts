@@ -1,23 +1,20 @@
 import { checkDatabaseConnection, pool } from "./database.js";
-import { getProjectStatus } from "./project.js";
 import { logger } from "./logging/logger.js";
+import { getProjectStatus } from "./project.js";
 
-logger.info("Testing Pino logger");
-logger.warn("Testing warning logs");
-logger.error("Testing error logs");
 async function main(): Promise<void> {
   try {
-    console.log(getProjectStatus());
+    logger.info(getProjectStatus());
 
     const connected = await checkDatabaseConnection();
 
-    console.log(`PostgreSQL connected: ${connected}`);
+    logger.info({ connected }, "PostgreSQL connection check completed");
   } finally {
     await pool.end();
   }
 }
 
 main().catch((error: unknown) => {
-  console.error("Application startup failed:", error);
+  logger.error({ err: error }, "Application startup failed");
   process.exitCode = 1;
 });
