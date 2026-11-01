@@ -1,6 +1,10 @@
 import { checkDatabaseConnection, pool } from "./database.js";
 import { getProjectStatus } from "./project.js";
+import { logger } from "./logging/logger.js";
 
+logger.info("Testing Pino logger");
+logger.warn("Testing warning logs");
+logger.error("Testing error logs");
 async function main(): Promise<void> {
   try {
     console.log(getProjectStatus());
