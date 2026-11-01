@@ -12,6 +12,12 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
+
+  DB_POOL_MAX: z.coerce.number().int().min(1).default(10),
+
+  DB_IDLE_TIMEOUT_MS: z.coerce.number().int().min(0).default(30000),
+
+  DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(1).default(5000),
 });
 
 const result = envSchema.safeParse(process.env);
