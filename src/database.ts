@@ -1,13 +1,8 @@
 import { Pool } from "pg";
-
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error("DATABASE_URL environment variable is required");
-}
+import { env } from "./config/env.js";
 
 export const pool = new Pool({
-  connectionString,
+  connectionString: env.DATABASE_URL,
 });
 
 export async function checkDatabaseConnection(): Promise<boolean> {
