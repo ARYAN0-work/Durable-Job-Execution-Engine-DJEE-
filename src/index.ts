@@ -1,20 +1,48 @@
-import { checkDatabaseConnection, pool } from "./database.js";
+import { initializeApplication } from "./app.js";
+import { pool } from "./database.js";
 import { logger } from "./logging/logger.js";
-import { getProjectStatus } from "./project.js";
 
-async function main(): Promise<void> {
+let isShuttingDown = false;
+
+async function shutdown(signal: string): Promise<void> {
+  if (isShuttingDown) {
+    logger.warn("Shutdown already in progress");
+    return;
+  }
+
+  isShuttingDown = true;
+
+  logger.info({ signal }, "Shutdown signal received");
+
   try {
-    logger.info(getProjectStatus());
-
-    const connected = await checkDatabaseConnection();
-
-    logger.info({ connected }, "PostgreSQL connection check completed");
-  } finally {
     await pool.end();
+
+    logger.info("PostgreSQL connection pool closed");
+
+    process.exitCode = 0;
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error occurred during application shutdown");
+
+    process.exitCode = 1;
   }
 }
 
-main().catch((error: unknown) => {
-  logger.error({ err: error }, "Application startup failed");
-  process.exitCode = 1;
+process.on("SIGINT", () => {
+  void shutdown("SIGINT");
 });
+
+process.on("SIGTERM", () => {
+  void shutdown("SIGTERM");
+});
+
+async function main(): Promise<void> {
+  try {
+    await initializeApplication();
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Application startup failed");
+
+    process.exitCode = 1;
+  }
+}
+
+void main();
