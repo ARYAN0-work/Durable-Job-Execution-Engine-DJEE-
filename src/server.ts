@@ -8,6 +8,7 @@ import { logger } from "./infrastructure/logging/logger.js";
 
 let httpServer: Server | undefined;
 let isShuttingDown = false;
+let serverStartup: Promise<void> | undefined;
 
 async function startHttpServer(): Promise<void> {
   const app = createApp();
@@ -89,7 +90,13 @@ async function main(): Promise<void> {
   try {
     await initializeApplication();
 
-    await startHttpServer();
+    if (isShuttingDown) {
+      logger.warn("Startup cancelled because shutdown has begun");
+      return;
+    }
+
+    serverStartup = startHttpServer();
+    await serverStartup;
   } catch (error: unknown) {
     logger.error({ err: error }, "Application startup failed");
 
