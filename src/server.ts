@@ -49,6 +49,13 @@ async function closeHttpServer(): Promise<void> {
   logger.info("HTTP server closed");
 }
 
+async function closeResources(): Promise<void> {
+  await closeHttpServer();
+  await pool.end();
+
+  logger.info("Application resources closed successfully");
+}
+
 async function shutdown(signal: string): Promise<void> {
   if (isShuttingDown) {
     logger.warn("Shutdown already in progress");
@@ -60,11 +67,7 @@ async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "Shutdown signal received");
 
   try {
-    await closeHttpServer();
-
-    await pool.end();
-
-    logger.info("PostgreSQL connection pool closed");
+    await closeResources();
 
     process.exitCode = 0;
   } catch (error: unknown) {
@@ -91,11 +94,11 @@ async function main(): Promise<void> {
     logger.error({ err: error }, "Application startup failed");
 
     try {
-      await pool.end();
+      await closeResources();
     } catch (shutdownError: unknown) {
       logger.error(
         { err: shutdownError },
-        "Failed to close PostgreSQL connection pool",
+        "Failed to close application resources",
       );
     }
 
