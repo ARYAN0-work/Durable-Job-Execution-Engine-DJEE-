@@ -8,7 +8,10 @@ import { logger } from "./infrastructure/logging/logger.js";
 
 let httpServer: Server | undefined;
 let isShuttingDown = false;
+
 let serverStartup: Promise<void> | undefined;
+let shutdownPromise: Promise<void> | undefined;
+let resourceCleanup: Promise<void> | undefined;
 
 async function startHttpServer(): Promise<void> {
   const app = createApp();
@@ -17,10 +20,14 @@ async function startHttpServer(): Promise<void> {
   httpServer = server;
 
   await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
+    const handleError = (error: Error): void => {
+      reject(error);
+    };
+
+    server.once("error", handleError);
 
     server.listen(env.PORT, () => {
-      server.off("error", reject);
+      server.off("error", handleError);
 
       logger.info({ port: env.PORT }, "HTTP server started successfully");
 
@@ -50,32 +57,53 @@ async function closeHttpServer(): Promise<void> {
   logger.info("HTTP server closed");
 }
 
-async function closeResources(): Promise<void> {
-  await closeHttpServer();
-  await pool.end();
+function closeResources(): Promise<void> {
+  if (!resourceCleanup) {
+    resourceCleanup = (async () => {
+      await closeHttpServer();
+      await pool.end();
 
-  logger.info("Application resources closed successfully");
+      logger.info("Application resources closed successfully");
+    })();
+  }
+
+  return resourceCleanup;
 }
 
-async function shutdown(signal: string): Promise<void> {
-  if (isShuttingDown) {
+function shutdown(signal: string): Promise<void> {
+  if (shutdownPromise) {
     logger.warn("Shutdown already in progress");
-    return;
+    return shutdownPromise;
   }
 
   isShuttingDown = true;
 
-  logger.info({ signal }, "Shutdown signal received");
+  shutdownPromise = (async () => {
+    logger.info({ signal }, "Shutdown signal received");
 
-  try {
-    await closeResources();
+    try {
+      if (serverStartup) {
+        try {
+          await serverStartup;
+        } catch {
+          logger.warn("HTTP server startup did not complete");
+        }
+      }
 
-    process.exitCode = 0;
-  } catch (error: unknown) {
-    logger.error({ err: error }, "Error occurred during application shutdown");
+      await closeResources();
 
-    process.exitCode = 1;
-  }
+      process.exitCode = 0;
+    } catch (error: unknown) {
+      logger.error(
+        { err: error },
+        "Error occurred during application shutdown",
+      );
+
+      process.exitCode = 1;
+    }
+  })();
+
+  return shutdownPromise;
 }
 
 process.on("SIGINT", () => {
@@ -96,9 +124,15 @@ async function main(): Promise<void> {
     }
 
     serverStartup = startHttpServer();
+
     await serverStartup;
   } catch (error: unknown) {
     logger.error({ err: error }, "Application startup failed");
+
+    if (isShuttingDown) {
+      process.exitCode = 1;
+      return;
+    }
 
     try {
       await closeResources();
