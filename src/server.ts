@@ -9,6 +9,28 @@ import { logger } from "./infrastructure/logging/logger.js";
 let httpServer: Server | undefined;
 let isShuttingDown = false;
 
+async function startHttpServer(): Promise<void> {
+  const app = createApp();
+  const server = createServer(app);
+
+  httpServer = server;
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+
+    server.listen(env.PORT, () => {
+      server.off("error", reject);
+
+      logger.info(
+        { port: env.PORT },
+        "HTTP server started successfully",
+      );
+
+      resolve();
+    });
+  });
+}
+
 async function shutdown(signal: string): Promise<void> {
   if (isShuttingDown) {
     logger.warn("Shutdown already in progress");
@@ -59,21 +81,8 @@ async function main(): Promise<void> {
   try {
     await initializeApplication();
 
-    const app = createApp();
-
-    httpServer = createServer(app);
-
-    await new Promise<void>((resolve, reject) => {
-      httpServer!.once("error", reject);
-
-      httpServer!.listen(env.PORT, () => {
-        httpServer!.off("error", reject);
-
-        logger.info({ port: env.PORT }, "HTTP server started successfully");
-
-        resolve();
-      });
-    });
+    await startHttpServer();
+    
   } catch (error: unknown) {
     logger.error({ err: error }, "Application startup failed");
 
