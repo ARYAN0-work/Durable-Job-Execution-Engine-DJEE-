@@ -1,4 +1,4 @@
-import { initializeApplication } from "./app.js";
+import { initializeApplication } from "./bootstrap/initialize.js";
 import { pool } from "./infrastructure/database/pool.js";
 import { logger } from "./infrastructure/logging/logger.js";
 
