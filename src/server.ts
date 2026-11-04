@@ -21,14 +21,32 @@ async function startHttpServer(): Promise<void> {
     server.listen(env.PORT, () => {
       server.off("error", reject);
 
-      logger.info(
-        { port: env.PORT },
-        "HTTP server started successfully",
-      );
+      logger.info({ port: env.PORT }, "HTTP server started successfully");
 
       resolve();
     });
   });
+}
+
+async function closeHttpServer(): Promise<void> {
+  const server = httpServer;
+
+  if (!server?.listening) {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+
+  logger.info("HTTP server closed");
 }
 
 async function shutdown(signal: string): Promise<void> {
@@ -42,20 +60,7 @@ async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "Shutdown signal received");
 
   try {
-    if (httpServer?.listening) {
-      await new Promise<void>((resolve, reject) => {
-        httpServer!.close((error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-
-          resolve();
-        });
-      });
-
-      logger.info("HTTP server closed");
-    }
+    await closeHttpServer();
 
     await pool.end();
 
@@ -82,7 +87,6 @@ async function main(): Promise<void> {
     await initializeApplication();
 
     await startHttpServer();
-    
   } catch (error: unknown) {
     logger.error({ err: error }, "Application startup failed");
 
