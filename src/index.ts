@@ -1,0 +1,109 @@
+import { initializeApplication } from "./bootstrap/initialize.js";
+import { pool } from "./infrastructure/database/pool.js";
+import { logger } from "./infrastructure/logging/logger.js";
+import { closeHttpServer, startHttpServer } from "./server.js";
+
+let isShuttingDown = false;
+let applicationInitialization: Promise<void> | undefined;
+let serverStartup: Promise<void> | undefined;
+let shutdownPromise: Promise<void> | undefined;
+let resourceCleanup: Promise<void> | undefined;
+
+function closeResources(): Promise<void> {
+  if (!resourceCleanup) {
+    resourceCleanup = (async () => {
+      await closeHttpServer();
+      await pool.end();
+
+      logger.info("Application resources closed successfully");
+    })();
+  }
+
+  return resourceCleanup;
+}
+
+function shutdown(signal: string): Promise<void> {
+  if (shutdownPromise) {
+    logger.warn("Shutdown already in progress");
+    return shutdownPromise;
+  }
+
+  isShuttingDown = true;
+
+  shutdownPromise = (async () => {
+    logger.info({ signal }, "Shutdown signal received");
+
+    try {
+      if (applicationInitialization) {
+        try {
+          await applicationInitialization;
+        } catch {
+          logger.warn("Application initialization did not complete");
+        }
+      }
+
+      if (serverStartup) {
+        try {
+          await serverStartup;
+        } catch {
+          logger.warn("HTTP server startup did not complete");
+        }
+      }
+
+      await closeResources();
+      process.exitCode = 0;
+    } catch (error: unknown) {
+      logger.error(
+        { err: error },
+        "Error occurred during application shutdown",
+      );
+
+      process.exitCode = 1;
+    }
+  })();
+
+  return shutdownPromise;
+}
+
+process.on("SIGINT", () => {
+  void shutdown("SIGINT");
+});
+
+process.on("SIGTERM", () => {
+  void shutdown("SIGTERM");
+});
+
+async function main(): Promise<void> {
+  try {
+    applicationInitialization = initializeApplication();
+    await applicationInitialization;
+
+    if (isShuttingDown) {
+      logger.warn("Startup cancelled because shutdown has begun");
+      return;
+    }
+
+    serverStartup = startHttpServer();
+    await serverStartup;
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Application startup failed");
+
+    if (isShuttingDown) {
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      await closeResources();
+    } catch (shutdownError: unknown) {
+      logger.error(
+        { err: shutdownError },
+        "Failed to close application resources",
+      );
+    }
+
+    process.exitCode = 1;
+  }
+}
+
+void main();
