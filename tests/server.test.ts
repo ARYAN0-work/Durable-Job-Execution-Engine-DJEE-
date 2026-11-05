@@ -37,4 +37,12 @@ describe("HTTP server lifecycle", () => {
 
     await expect(closeHttpServer()).resolves.toBeUndefined();
   });
+
+  it("should reject when the requested port is already occupied", async () => {
+    const occupiedPort = await startHttpServer(0);
+
+    await expect(startHttpServer(occupiedPort)).rejects.toThrow();
+
+    await closeHttpServer();
+  });
 });
