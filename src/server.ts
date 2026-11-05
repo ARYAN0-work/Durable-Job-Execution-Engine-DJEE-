@@ -9,36 +9,41 @@ let httpServer: Server | undefined;
 export async function startHttpServer(
   port: number = env.PORT,
 ): Promise<number> {
+  if (httpServer?.listening) {
+    throw new Error("HTTP server is already running");
+  }
+
   const app = createApp();
   const server = createServer(app);
 
-  httpServer = server;
-
   return new Promise<number>((resolve, reject) => {
     const handleError = (error: Error): void => {
-      if (httpServer === server) {
-        httpServer = undefined;
-      }
-
+      server.off("listening", handleListening);
       reject(error);
     };
 
-    server.once("error", handleError);
-
-    server.listen(port, () => {
+    const handleListening = (): void => {
       server.off("error", handleError);
 
       const address = server.address();
 
       if (!address || typeof address === "string") {
+        server.close();
         reject(new Error("Unable to determine HTTP server port"));
         return;
       }
 
+      httpServer = server;
+
       logger.info({ port: address.port }, "HTTP server started successfully");
 
       resolve(address.port);
-    });
+    };
+
+    server.once("error", handleError);
+    server.once("listening", handleListening);
+
+    server.listen(port);
   });
 }
 
@@ -61,7 +66,9 @@ export async function closeHttpServer(): Promise<void> {
     });
   });
 
-  httpServer = undefined;
+  if (httpServer === server) {
+    httpServer = undefined;
+  }
 
   logger.info("HTTP server closed");
 }
