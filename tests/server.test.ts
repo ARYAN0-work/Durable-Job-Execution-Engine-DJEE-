@@ -45,4 +45,14 @@ describe("HTTP server lifecycle", () => {
 
     await closeHttpServer();
   });
+
+  it("should reject duplicate server startup without affecting the running server", async () => {
+    const occupiedPort = await startHttpServer(0);
+
+    await expect(startHttpServer(occupiedPort)).rejects.toThrow();
+
+    const response = await fetch(`http://127.0.0.1:${occupiedPort}/health`);
+
+    expect(response.status).toBe(200);
+  });
 });
