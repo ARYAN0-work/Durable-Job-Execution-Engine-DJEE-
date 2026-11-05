@@ -55,4 +55,8 @@ describe("HTTP server lifecycle", () => {
 
     expect(response.status).toBe(200);
   });
+
+  it("should safely close when the HTTP server is not running", async () => {
+    await expect(closeHttpServer()).resolves.toBeUndefined();
+  });
 });
