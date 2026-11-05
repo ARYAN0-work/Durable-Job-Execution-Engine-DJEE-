@@ -27,4 +27,14 @@ describe("HTTP server lifecycle", () => {
       service: "durable-job-execution-engine",
     });
   });
+
+  it("should close the HTTP server gracefully", async () => {
+    const port = await startHttpServer(0);
+
+    await closeHttpServer();
+
+    await expect(fetch(`http://127.0.0.1:${port}/health`)).rejects.toThrow();
+
+    await expect(closeHttpServer()).resolves.toBeUndefined();
+  });
 });
