@@ -41,4 +41,28 @@ describe("startApplication", () => {
     expect(startServer).not.toHaveBeenCalled();
     expect(closeResources).toHaveBeenCalledOnce();
   });
+
+  it("should clean up resources when server startup fails", async () => {
+    const startupError = new Error("HTTP server failed to start");
+
+    const initialize = vi.fn(async () => undefined);
+
+    const startServer = vi.fn(async () => {
+      throw startupError;
+    });
+
+    const closeResources = vi.fn(async () => undefined);
+
+    await expect(
+      startApplication({
+        initialize,
+        startServer,
+        closeResources,
+      }),
+    ).rejects.toThrow(startupError);
+
+    expect(initialize).toHaveBeenCalledOnce();
+    expect(startServer).toHaveBeenCalledOnce();
+    expect(closeResources).toHaveBeenCalledOnce();
+  });
 });
