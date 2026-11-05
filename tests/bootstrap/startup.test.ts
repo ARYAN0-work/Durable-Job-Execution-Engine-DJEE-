@@ -65,4 +65,36 @@ describe("startApplication", () => {
     expect(startServer).toHaveBeenCalledOnce();
     expect(closeResources).toHaveBeenCalledOnce();
   });
+
+  it("should preserve both errors when startup and cleanup fail", async () => {
+    const startupError = new Error("HTTP server failed to start");
+    const cleanupError = new Error("Database pool failed to close");
+
+    const initialize = vi.fn(async () => undefined);
+
+    const startServer = vi.fn(async () => {
+      throw startupError;
+    });
+
+    const closeResources = vi.fn(async () => {
+      throw cleanupError;
+    });
+
+    const promise = startApplication({
+      initialize,
+      startServer,
+      closeResources,
+    });
+
+    await expect(promise).rejects.toMatchObject({
+      name: "AggregateError",
+      message: "Application startup and resource cleanup both failed",
+      cause: cleanupError,
+      errors: [startupError, cleanupError],
+    });
+
+    expect(initialize).toHaveBeenCalledOnce();
+    expect(startServer).toHaveBeenCalledOnce();
+    expect(closeResources).toHaveBeenCalledOnce();
+  });
 });
