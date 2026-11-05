@@ -1,4 +1,5 @@
 import { initializeApplication } from "./bootstrap/initialize.js";
+import { startApplication } from "./bootstrap/startup.js";
 import { pool } from "./infrastructure/database/pool.js";
 import { logger } from "./infrastructure/logging/logger.js";
 import { closeHttpServer, startHttpServer } from "./server.js";
@@ -18,7 +19,6 @@ async function closeResources(): Promise<void> {
         await closeHttpServer();
       } catch (error: unknown) {
         cleanupErrors.push(error);
-
         logger.error({ err: error }, "Failed to close HTTP server");
       }
 
@@ -26,7 +26,6 @@ async function closeResources(): Promise<void> {
         await pool.end();
       } catch (error: unknown) {
         cleanupErrors.push(error);
-
         logger.error(
           { err: error },
           "Failed to close PostgreSQL connection pool",
@@ -100,34 +99,29 @@ process.on("SIGTERM", () => {
 
 async function main(): Promise<void> {
   try {
-    applicationInitialization = initializeApplication();
-    await applicationInitialization;
+    await startApplication({
+      initialize: () => {
+        applicationInitialization = initializeApplication();
+        return applicationInitialization;
+      },
 
-    if (isShuttingDown) {
-      logger.warn("Startup cancelled because shutdown has begun");
-      return;
-    }
+      startServer: () => {
+        if (isShuttingDown) {
+          throw new Error("Application startup cancelled due to shutdown");
+        }
 
-    serverStartup = startHttpServer();
-    await serverStartup;
+        serverStartup = startHttpServer();
+        return serverStartup;
+      },
+
+      closeResources,
+    });
   } catch (error: unknown) {
     logger.error({ err: error }, "Application startup failed");
 
-    if (isShuttingDown) {
+    if (!isShuttingDown) {
       process.exitCode = 1;
-      return;
     }
-
-    try {
-      await closeResources();
-    } catch (shutdownError: unknown) {
-      logger.error(
-        { err: shutdownError },
-        "Failed to close application resources",
-      );
-    }
-
-    process.exitCode = 1;
   }
 }
 
