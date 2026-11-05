@@ -6,6 +6,10 @@ export default defineConfig({
     globals: false,
     clearMocks: true,
     restoreMocks: true,
+    env: {
+      NODE_ENV: "test",
+      DATABASE_URL: "postgresql://test:test@localhost:5432/djee_test",
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
