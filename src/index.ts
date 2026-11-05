@@ -9,11 +9,36 @@ let serverStartup: Promise<number> | undefined;
 let shutdownPromise: Promise<void> | undefined;
 let resourceCleanup: Promise<void> | undefined;
 
-function closeResources(): Promise<void> {
+async function closeResources(): Promise<void> {
   if (!resourceCleanup) {
     resourceCleanup = (async () => {
-      await closeHttpServer();
-      await pool.end();
+      const cleanupErrors: unknown[] = [];
+
+      try {
+        await closeHttpServer();
+      } catch (error: unknown) {
+        cleanupErrors.push(error);
+
+        logger.error({ err: error }, "Failed to close HTTP server");
+      }
+
+      try {
+        await pool.end();
+      } catch (error: unknown) {
+        cleanupErrors.push(error);
+
+        logger.error(
+          { err: error },
+          "Failed to close PostgreSQL connection pool",
+        );
+      }
+
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(
+          cleanupErrors,
+          "One or more application resources failed to close",
+        );
+      }
 
       logger.info("Application resources closed successfully");
     })();
