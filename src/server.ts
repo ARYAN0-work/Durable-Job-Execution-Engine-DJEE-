@@ -6,25 +6,38 @@ import { logger } from "./infrastructure/logging/logger.js";
 
 let httpServer: Server | undefined;
 
-export async function startHttpServer(): Promise<void> {
+export async function startHttpServer(
+  port: number = env.PORT,
+): Promise<number> {
   const app = createApp();
   const server = createServer(app);
 
   httpServer = server;
 
-  await new Promise<void>((resolve, reject) => {
+  return new Promise<number>((resolve, reject) => {
     const handleError = (error: Error): void => {
+      if (httpServer === server) {
+        httpServer = undefined;
+      }
+
       reject(error);
     };
 
     server.once("error", handleError);
 
-    server.listen(env.PORT, () => {
+    server.listen(port, () => {
       server.off("error", handleError);
 
-      logger.info({ port: env.PORT }, "HTTP server started successfully");
+      const address = server.address();
 
-      resolve();
+      if (!address || typeof address === "string") {
+        reject(new Error("Unable to determine HTTP server port"));
+        return;
+      }
+
+      logger.info({ port: address.port }, "HTTP server started successfully");
+
+      resolve(address.port);
     });
   });
 }
@@ -33,6 +46,7 @@ export async function closeHttpServer(): Promise<void> {
   const server = httpServer;
 
   if (!server?.listening) {
+    httpServer = undefined;
     return;
   }
 

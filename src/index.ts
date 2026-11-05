@@ -5,7 +5,7 @@ import { closeHttpServer, startHttpServer } from "./server.js";
 
 let isShuttingDown = false;
 let applicationInitialization: Promise<void> | undefined;
-let serverStartup: Promise<void> | undefined;
+let serverStartup: Promise<number> | undefined;
 let shutdownPromise: Promise<void> | undefined;
 let resourceCleanup: Promise<void> | undefined;
 
