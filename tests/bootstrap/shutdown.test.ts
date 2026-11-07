@@ -26,4 +26,38 @@ describe("Shutdown handler", () => {
     expect(closeResources).toHaveBeenCalledOnce();
     expect(setExitCode).toHaveBeenCalledWith(0);
   });
+
+  it("should prevent duplicate shutdown execution", async () => {
+    let resolveInitialization!: () => void;
+
+    const initialization = new Promise<void>((resolve) => {
+      resolveInitialization = resolve;
+    });
+
+    const closeResources = vi.fn(async () => undefined);
+    const onShutdownStart = vi.fn();
+    const setExitCode = vi.fn();
+
+    const shutdown = createShutdownHandler({
+      getInitialization: () => initialization,
+      getServerStartup: () => Promise.resolve(3000),
+      closeResources,
+      onShutdownStart,
+      setExitCode,
+    });
+
+    const firstShutdown = shutdown("SIGTERM");
+    const secondShutdown = shutdown("SIGINT");
+
+    expect(secondShutdown).toBe(firstShutdown);
+    expect(onShutdownStart).toHaveBeenCalledOnce();
+
+    resolveInitialization();
+
+    await firstShutdown;
+
+    expect(closeResources).toHaveBeenCalledOnce();
+    expect(setExitCode).toHaveBeenCalledOnce();
+    expect(setExitCode).toHaveBeenCalledWith(0);
+  });
 });
