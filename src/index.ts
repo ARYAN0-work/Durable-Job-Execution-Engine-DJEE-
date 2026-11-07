@@ -1,4 +1,5 @@
 import { initializeApplication } from "./bootstrap/initialize.js";
+import { createShutdownHandler } from "./bootstrap/shutdown.js";
 import { startApplication } from "./bootstrap/startup.js";
 import { pool } from "./infrastructure/database/pool.js";
 import { logger } from "./infrastructure/logging/logger.js";
@@ -7,7 +8,6 @@ import { closeHttpServer, startHttpServer } from "./server.js";
 let isShuttingDown = false;
 let applicationInitialization: Promise<void> | undefined;
 let serverStartup: Promise<number> | undefined;
-let shutdownPromise: Promise<void> | undefined;
 let resourceCleanup: Promise<void> | undefined;
 
 async function closeResources(): Promise<void> {
@@ -46,48 +46,19 @@ async function closeResources(): Promise<void> {
   return resourceCleanup;
 }
 
-function shutdown(signal: string): Promise<void> {
-  if (shutdownPromise) {
-    logger.warn("Shutdown already in progress");
-    return shutdownPromise;
-  }
+const shutdown = createShutdownHandler({
+  getInitialization: () => applicationInitialization,
+  getServerStartup: () => serverStartup,
+  closeResources,
 
-  isShuttingDown = true;
+  onShutdownStart: () => {
+    isShuttingDown = true;
+  },
 
-  shutdownPromise = (async () => {
-    logger.info({ signal }, "Shutdown signal received");
-
-    try {
-      if (applicationInitialization) {
-        try {
-          await applicationInitialization;
-        } catch {
-          logger.warn("Application initialization did not complete");
-        }
-      }
-
-      if (serverStartup) {
-        try {
-          await serverStartup;
-        } catch {
-          logger.warn("HTTP server startup did not complete");
-        }
-      }
-
-      await closeResources();
-      process.exitCode = 0;
-    } catch (error: unknown) {
-      logger.error(
-        { err: error },
-        "Error occurred during application shutdown",
-      );
-
-      process.exitCode = 1;
-    }
-  })();
-
-  return shutdownPromise;
-}
+  setExitCode: (code) => {
+    process.exitCode = code;
+  },
+});
 
 process.on("SIGINT", () => {
   void shutdown("SIGINT");
