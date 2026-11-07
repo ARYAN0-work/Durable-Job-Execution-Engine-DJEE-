@@ -60,4 +60,32 @@ describe("Shutdown handler", () => {
     expect(setExitCode).toHaveBeenCalledOnce();
     expect(setExitCode).toHaveBeenCalledWith(0);
   });
+
+  it("should continue shutdown when initialization fails", async () => {
+    const initializationError = new Error("Database initialization failed");
+
+    const initialize = vi.fn(async () => {
+      throw initializationError;
+    });
+
+    const startServer = vi.fn(async () => 3000);
+    const closeResources = vi.fn(async () => undefined);
+    const onShutdownStart = vi.fn();
+    const setExitCode = vi.fn();
+
+    const shutdown = createShutdownHandler({
+      getInitialization: () => initialize(),
+      getServerStartup: () => startServer(),
+      closeResources,
+      onShutdownStart,
+      setExitCode,
+    });
+
+    await shutdown("SIGTERM");
+
+    expect(initialize).toHaveBeenCalledOnce();
+    expect(startServer).toHaveBeenCalledOnce();
+    expect(closeResources).toHaveBeenCalledOnce();
+    expect(setExitCode).toHaveBeenCalledWith(0);
+  });
 });
