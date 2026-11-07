@@ -1,6 +1,11 @@
-node_modules
-dist
-.env
+# Dependencies
+node_modules/
 
-# Test coverage reports
+# Build output
+dist/
+
+# Test coverage
 coverage/
+
+# Environment variables
+.env
